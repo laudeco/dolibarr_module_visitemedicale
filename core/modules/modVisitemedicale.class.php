@@ -277,19 +277,8 @@ class modVisitemedicale extends DolibarrModules
 	 */
 	function init($options='')
 	{
-		$sql = array();
-
-		$result=$this->_load_tables('/visitemedicale/sql/');
-
-        define('INC_FROM_DOLIBARR',true);
-        dol_include_once('/visitemedicale/config.php');
-        
-        $PDOdb=new TPDOdb;
-        
-        $o=new TVisiteMedicale;
-        $o->init_db_by_vars($PDOdb);
-
-		return $this->_init($sql, $options);
+		$this->_load_tables('/visitemedicale/sql/');
+		return $this->_init([], $options);
 	}
 
 	/**

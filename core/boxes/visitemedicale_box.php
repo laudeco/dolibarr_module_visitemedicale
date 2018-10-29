@@ -34,7 +34,6 @@ class visitemedicale_box extends ModeleBoxes
     public $boximg = "visitemedicale@visitemedicale";
     public $boxlabel;
     public $depends = array("visitemedicale");
-    public $db;
     public $param;
     public $info_box_head = array();
     public $info_box_contents = array();
@@ -44,7 +43,10 @@ class visitemedicale_box extends ModeleBoxes
      */
     public function __construct()
     {
-        global $langs;
+        global $langs, $db;
+
+        parent::__construct($db);
+
         $langs->load("boxes");
         $langs->load("visitemedicale@visitemedicale");
 
@@ -59,25 +61,22 @@ class visitemedicale_box extends ModeleBoxes
      */
     public function loadBox($max = 5)
     {
-        global $conf, $user, $langs, $db;
+        global $user, $langs;
 
 		if ($user->rights->visitemedicale->read_all || $user->rights->visitemedicale->read_own) {
 			$this->max = $max;
 
-	        //include_once DOL_DOCUMENT_ROOT . "/visitemedicale/class/visitemedicale.class.php";
-	
 	        $text = $langs->trans("VisitesMedicalesToPlannifDescrip", $max);
 	        $this->info_box_head = array(
 	            'text' => $text,
 	            'limit' => dol_strlen($text)
-	            
+
 	        );
-	
+
 	        define('INC_FROM_DOLIBARR',true);
 	        dol_include_once('/visitemedicale/config.php');
-	
-	        $PDOdb=new TPDOdb;
-	        $Tab = $PDOdb->ExecuteAsArray("SELECT u.rowid as fk_user 
+
+	        $Tab = $this->db->query("SELECT u.rowid as fk_user 
 	        ,(SELECT MAX(date_next_visite) FROM ".MAIN_DB_PREFIX."visitemedicale
 	            WHERE fk_user=u.rowid
 	        ) as date_next
@@ -87,27 +86,29 @@ class visitemedicale_box extends ModeleBoxes
 	        
 	        FROM ".MAIN_DB_PREFIX."user u WHERE statut=1 
 	        ");
-	
+
 	        $this->info_box_contents=array();
-	
-	        foreach($Tab as $row) {
-	            $u=new User($db);
+
+	        foreach($Tab as $index) {
+	            $row = $this->db->fetch_object($Tab);
+
+	            $u=new User($this->db);
 	            $u->fetch($row->fk_user);
-	            
+
 				if ($user->rights->visitemedicale->read_own && !$user->rights->visitemedicale->read_all && $u->id != $user->id)
 					continue;
-				
+
 	            $t_next = strtotime($row->date_next);
 	            $t_last = strtotime($row->date_last);
-	            
-	          
+
+
 	            if($t_last>time() && $t_last<strtotime("+2month")) {
 	                $date = date('d/m/Y', $t_last);
 	                $url=dol_buildpath('/visitemedicale/visitemedicale.php?action=load_last&fk_user='.$u->id,1);
 	                $statut = img_picto('','statut4');
 	            }
 	            else if($t_next<strtotime("+2month") ) { // la prochaine visite est dans moins de 2 mois
-	                
+
 	                if($t_next<time()) {
 	                    $date="En retard !";
 	                    $url=dol_buildpath('/visitemedicale/visitemedicale.php?action=new&fk_user='.$u->id,1);
@@ -116,15 +117,15 @@ class visitemedicale_box extends ModeleBoxes
 	                else{
 	                    $date = date('d/m/Y', $t_next);
 	                    $url=dol_buildpath('/visitemedicale/visitemedicale.php?action=new&fk_user='.$u->id.'&date_visite='.$date,1);
-	                    $statut = img_picto('','statut0');    
+	                    $statut = img_picto('','statut0');
 	                }
-	                
-	                
-	            }   
+
+
+	            }
 	            else{
 	                continue;
-	            }       
-	                      
+	            }
+
 	            $this->info_box_contents[] = array(
 	                array(
 	                    'td' => 'align="left"'
@@ -134,21 +135,21 @@ class visitemedicale_box extends ModeleBoxes
 	                )
 	                ,array(
 	                    'td' => 'align="right"'
-	                    ,'text' =>$date 
+	                    ,'text' =>$date
 	                    ,'url'=>$url
 	                )
 	                ,array(
 	                    'td' => 'align="left"'
 	                    ,'text' =>$statut
 	                    ,'url'=>''
-	                    
+
 	                )
 	            );
-	            
+
 	        }
-	
+
 	        $this->info_box_contents[] =array(
-	                   array( 
+	                   array(
 	                    'td' => 'align="right" colspan="3"',
 	                    'text' => "Gérer les visites médicales",
 	                    'url' => dol_buildpath('/visitemedicale/visitemedicale.php',1)
@@ -163,8 +164,8 @@ class visitemedicale_box extends ModeleBoxes
      * 	@param  array	$contents   Array with properties of box lines
      * 	@return	void
      */
-    public function showBox($head = null, $contents = null)
+    public function showBox($head = null, $contents = null, $noOutPOut = false)
     {
-        parent::showBox($this->info_box_head, $this->info_box_contents);
+        parent::showBox($this->info_box_head, $this->info_box_contents, $noOutPOut);
     }
 }

@@ -2,14 +2,12 @@
 require 'config.php';
 require_once 'lib/visitemedicale.lib.php';
 
-global $user, $langs;
+global $user, $langs, $db;
 
 if (!$user->rights->visitemedicale->read_own && !$user->rights->visitemedicale->read_all)
 	accessforbidden();
 
 $langs->Load("visitemedicale@visitemedicale");
-
-$PDOdb = new TPDOdb;
 
 $action = __get('action', 'list');
 $user_id = __get('fk_user');
@@ -20,13 +18,13 @@ switch ($action) {
 		if (!$user->rights->visitemedicale->create)
 			accessforbidden();
 		
-		$visite = new TVisiteMedicale;
+		$visite = new TVisiteMedicale($db);
 		
 		if (__get('date_visite')) {
 			$visite->date_visite = strtotime(str_replace('/', '-', __get('date_visite')));
 		}
 		
-		_fiche_visite($PDOdb, $visite, 'new');
+		_fiche_visite($visite, 'new');
 		break;
 	case 'load_last':
 		if ($user->rights->visitemedicale->read_own && !$user->rights->visitemedicale->read_all && $user->id != $user_id)
@@ -48,10 +46,10 @@ switch ($action) {
 		$result = $PDOdb->Execute($sql);
 		$v = $result->fetch(PDO::FETCH_OBJ);
 		
-		$visite = new TVisiteMedicale;
-		$visite->load($PDOdb, $v->rowid);
+		$visite = new TVisiteMedicale($db);
+		$visite->fetch($v->rowid);
 		
-		_fiche_visite($PDOdb, $visite);
+		_fiche_visite($visite);
 		break;
 	case 'view':
 	case 'edit':
@@ -59,8 +57,8 @@ switch ($action) {
 			if ($action == 'edit' && !$user->rights->visitemedicale->create)
 				accessforbidden();
 			
-			$visite = new TVisiteMedicale;
-			$visite->load($PDOdb, $_REQUEST['id']);
+			$visite = new TVisiteMedicale($db);
+			$visite->fetch($_REQUEST['id']);
 
 			if ($action == 'view') {
 				if (!$user->rights->visitemedicale->read_own && !$user->rights->visitemedicale->read_all)
@@ -70,7 +68,7 @@ switch ($action) {
 					accessforbidden();
 			}
 			
-			_fiche_visite($PDOdb, $visite, $action);
+			_fiche_visite($visite, $action);
 		}
 		break;
 	case 'list':
@@ -78,7 +76,7 @@ switch ($action) {
 		break;
 	case 'save':
 		if (empty($_REQUEST['cancel'])) {
-			$visite = new TVisiteMedicale;
+			$visite = new TVisiteMedicale($db);
 			if(!empty($_REQUEST['id'])) $visite->load($PDOdb, $_REQUEST['id'], false);
 
 			$TData = $_REQUEST;
@@ -93,8 +91,8 @@ switch ($action) {
 				$TData['date_next_visite'] = $date;
 			}
 			
-			$visite->set_values($TData);
-			$visite->save($PDOdb);
+			$visite->setValues($TData);
+			$visite->update($user);
 		}
 		
 		$redirect = dirname($_SERVER['PHP_SELF']) . '/visitemedicale.php';
@@ -110,7 +108,7 @@ switch ($action) {
 		if (!$user->rights->visitemedicale->create)
 				accessforbidden();
 		
-		$visite = new TVisiteMedicale;
+		$visite = new TVisiteMedicale($db);
 		$visite->load($PDOdb, $_REQUEST['id']);
 		
 		$visite->delete($PDOdb);
@@ -127,7 +125,11 @@ llxFooter();
 
 $db->close();
 
-function _fiche_visite(&$PDOdb, &$visite, $mode = 'view') {
+/**
+ * @param        $visite
+ * @param string $mode
+ */
+function _fiche_visite(&$visite, $mode = 'view') {
 	global $user, $langs, $db;
 	
 	llxHeader('', $langs->trans('VisiteMedicale'),'','');
@@ -199,8 +201,8 @@ function _liste_visites(&$PDOdb) {
 
 	dol_fiche_head(null, 'visitemedicale', $langs->trans('VisiteMedicale'), 0, 'visitemedicale@visitemedicale');
 	
-	$visite = new TVisiteMedicale;
-	$r = new TSSRenderControler($visite);
+	$visite = new TVisiteMedicale($db);
+	$r = new Listview($db, 'hksqfdgq ksqu');
 
 	$THide = array('firstname', 'lastname', 'date_visite');
 	
@@ -214,9 +216,9 @@ function _liste_visites(&$PDOdb) {
 		$sql .= 'WHERE visitemedicale.fk_user = ' . $user->id . ' ';
 	}
 	
-	$sql .= 'ORDER BY date_visite;';
+	$sql .= 'ORDER BY date_visite';
 
-	$r->liste($PDOdb, $sql, array(
+	echo $r->render( $sql, array(
 		'limit' => array(
 			'nbLine' => '30'
 		)
@@ -231,7 +233,7 @@ function _liste_visites(&$PDOdb) {
 			,'date_next_visite' => 'datetime'
 		)
 		,'liste' => array(
-			'titre'=> 'Liste des visites médicales'
+			'title'=> 'Liste des visites médicales'
 			,'image' => img_picto('','title.png', '', 0)
 			,'picto_precedent' => img_picto('','back.png', '', 0)
 			,'picto_suivant' => img_picto('','next.png', '', 0)
@@ -278,7 +280,9 @@ function _get_user_link($firstname, $lastname) {
 }
 
 function _get_libelle_categorie ($categorie, $valeur) {
-	$visite = new TVisiteMedicale;
+    global $db;
+
+	$visite = new TVisiteMedicale($db);
 	
 	if ($categorie == 'type_visite') {
 		return $visite->TType[$valeur];
